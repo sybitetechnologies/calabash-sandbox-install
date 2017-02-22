@@ -1,0 +1,19 @@
+(.*/)?\#[^/]*\#$
+*~
+*.bak
+*.swp
+tmp
+.DS_Store
+__MACOSX
+.idea
+.irb-history
+.ruby-version
+.pry-history
+
+# Sometimes the server is cloned during testing.
+calabash-ios-server
+
+
+CalabashGems.zip
+
+*.lock

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+SCRIPT_VERSION="0.1.18"
+
+SANDBOX="${HOME}/.calabash/sandbox"
+THIS_SCRIPT=$(basename $0)
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "Calabash-sandbox only runs on Mac OSX"
+  exit 1
+fi
+
+if [ "${1}" == "version" ]; then
+  echo "Calabash sandbox version: ${SCRIPT_VERSION}"
+  exit 0
+elif [ "${1}" == "update" ]; then
+  echo "Updating gems..."
+  cd "${SANDBOX}"
+  curl -O --fail --progress-bar \
+    https://raw.githubusercontent.com/calabash/install/master/Gemfile.OSX 2> /dev/null
+
+  EC=$?
+  if [ $EC -ne 0 ]; then
+    echo "Unable to download newest Gemfile. Please try again."
+    exit $EC
+  else
+    mv Gemfile.OSX Gemfile
+    # Install within sandbox to ensure gems are available in sandbox
+    { echo "bundle update >&2" |  "${THIS_SCRIPT}" 1>/dev/null; } 2>&1
+    echo
+    echo "Done! Now the sandbox contains:"
+    IOS=$( { echo "calabash-ios version >&2" | "${THIS_SCRIPT}" 1>/dev/null; } 2>&1)
+    DROID=$( { echo "calabash-android version >&2" | "${THIS_SCRIPT}" 1>/dev/null; } 2>&1)
+    TCS=$( { echo "test-cloud version >&2" | "${THIS_SCRIPT}" 1>/dev/null; } 2>&1)
+    echo -e "\033[0;33mcalabash-ios:       $IOS"
+    echo "calabash-android:   $DROID"
+    echo -e "xamarin-test-cloud: $TCS\033[00m"
+    exit 0
+  fi
+fi
+
+CALABASH_RUBY_VERSION="2.3.1"
+CALABASH_RUBY_PATH="${HOME}/.calabash/sandbox/Rubies/${CALABASH_RUBY_VERSION}/bin"
+CALABASH_GEM_HOME="${HOME}/.calabash/sandbox/Gems"
+export GEM_HOME="${CALABASH_GEM_HOME}"
+export GEM_PATH="${CALABASH_GEM_HOME}:${CALABASH_GEM_HOME}/ruby/2.3.0"
+
+PATH="${CALABASH_RUBY_PATH}:${GEM_HOME}/bin:${PATH}"
+
+for dir in `echo "${PATH}" | sed "s/:/ /g"`
+do
+  rbenv=`echo "${dir}" | grep .rbenv`
+  if [ -n "${rbenv}" ]; then
+      #echo "INFO: found '.rbenv' in path: ${dir} - skipping"
+      continue
+  fi
+
+  rvm=`echo "${dir}" | grep .rvm`
+  if [ -n "${rvm}" ]; then
+      # echo "INFO: found '.rvm' in path: ${dir} - skipping"
+      continue
+  fi
+
+  COMPOSED_PATH="${COMPOSED_PATH}:${dir}"
+done
+
+#Need to ensure adb is accessible for android
+command -v adb > /dev/null
+if [ $? -eq 0 ]; then
+  ADB=$(dirname $(which adb))
+  COMPOSED_PATH="${COMPOSED_PATH}:${ADB}"
+fi
+
+export PATH="${COMPOSED_PATH}"
+unset COMPOSED_PATH
+export PS1='\[\e[1;32m\][\u@calabash-sandbox]\$\[\e[0m\] ' # '[<user>@calabash-sandbox]$ '
+echo -e "\033[0;32mThis terminal is now ready to use with Calabash.\033[00m"
+echo -e "\033[0;34mTo exit, type 'exit'.\033[00m"
+bash && echo -e "\n\033[0;32mThis terminal is back to normal.\033[00m"
